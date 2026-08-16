@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logo.gif" width="120" height="120" alt="CLIPIT Logo" />
+  <img src="clip-svgrepo-com.svg" width="96" height="96" alt="CLIPIT Logo" />
   <h1>CLIPIT</h1>
   <p><b>Autonomous AI Engine for Long-to-Short Video Repurposing</b></p>
 
