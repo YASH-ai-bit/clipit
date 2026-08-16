@@ -22,7 +22,7 @@ It executes a complete local-to-cloud autonomous pipeline: downloading media, ge
 
 ---
 
-## ⚙️ Technical Workflow & Pipeline Architecture
+## Technical Workflow & Pipeline Architecture
 
 ```
                                       [ Input Media ]
@@ -83,8 +83,8 @@ It executes a complete local-to-cloud autonomous pipeline: downloading media, ge
 
 #### 2. Sub-Second Acoustic Transcription
 - Powered by `faster-whisper` running on the **CTranslate2** quantized inference engine.
-- Employs **INT8/FP16 transformer quantization**, running **4× faster** than vanilla Whisper with a fraction of the RAM/VRAM footprint.
-- Emits word-level timestamp boundaries (`start`, `end`, `word`) cached as `<video>.transcript.json` for $O(1)$ re-runs.
+- Employs **INT8/FP16 transformer quantization**, running **4x faster** than vanilla Whisper with a fraction of the RAM/VRAM footprint.
+- Emits word-level timestamp boundaries (`start`, `end`, `word`) cached as `<video>.transcript.json` for O(1) re-runs.
 
 #### 3. Multi-Scale Sliding Candidate Windows
 - Generates overlapping multi-scale temporal windows across 3 standard short-form brackets: **30s, 45s, and 60s** with a **15s stride**.
@@ -97,7 +97,7 @@ It executes a complete local-to-cloud autonomous pipeline: downloading media, ge
   2. **Self-Containment (0–2.5)**: Coherent and understandable without exterior context.
   3. **Payoff & Climax (0–2.5)**: Meaningful punchline, emotional resonance, or insight.
   4. **Short-Form Fit (0–2.5)**: Overall narrative pacing.
-- **Temporal Non-Maximum Suppression (NMS)**: Calculates temporal Intersection-over-Union (IoU) across candidates and drops overlapping redundant segments to pick the top $N$ diverse moments.
+- **Temporal Non-Maximum Suppression (NMS)**: Calculates temporal Intersection-over-Union (IoU) across candidates and drops overlapping redundant segments to pick the top N diverse moments.
 
 #### 5. Intelligent 9:16 Reframing & Dynamic ASS Caption Burning
 - Spatially scales and crops 16:9 landscape to **1080×1920 portrait**.
@@ -108,7 +108,7 @@ It executes a complete local-to-cloud autonomous pipeline: downloading media, ge
 
 ---
 
-## ⚡ Cost Efficiency
+## Cost Efficiency
 
 Because transcription runs locally and prompt payloads are compressed, scoring an entire video costs fractions of a cent:
 
@@ -122,7 +122,7 @@ Because transcription runs locally and prompt payloads are compressed, scoring a
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ### 1. Prerequisites
 - **Python 3.12** (recommended for pre-built CTranslate2 and PyAV wheels)
@@ -150,7 +150,7 @@ OPENROUTER_MODEL=openai/gpt-4o-mini
 
 ---
 
-## 💻 Usage
+## Usage
 
 ### Option A: Ultra-Minimal Web UI
 Launch the sleek, monochrome web dashboard:
@@ -181,7 +181,7 @@ python clipper.py --input video.mp4 --verbose
 
 ---
 
-## 📂 Output Structure
+## Output Structure
 
 ```
 output/
@@ -203,7 +203,7 @@ Reasoning: Culmination of profound insights about life; deeply impactful with st
 
 ---
 
-## 🧪 Testing
+## Testing
 
 Run the full unit test suite:
 ```bash
@@ -213,5 +213,5 @@ All 57 unit tests pass with 0 external dependencies (testing URL detection, cand
 
 ---
 
-## 📄 License
+## License
 MIT License. Built for hackathons and production video pipelines.
