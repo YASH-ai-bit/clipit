@@ -483,19 +483,44 @@ body {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
 }
 
+/* Video Frame with exact 9:16 aspect ratio */
 .video-frame {
   width: 100%;
   aspect-ratio: 9 / 16;
   background: var(--black);
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+/* Video Player with contain to prevent cutting any vertical captions */
 .video-player {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--black);
   display: block;
+}
+
+/* Native & browser fullscreen handling: strictly preserve 9:16 vertical ratio */
+.video-player:fullscreen,
+.video-player:-webkit-full-screen,
+.video-player:-moz-full-screen {
+  object-fit: contain !important;
+  background: #000000 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+.video-frame:fullscreen,
+.video-frame:-webkit-full-screen,
+.video-frame:-moz-full-screen {
+  background: #000000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .clip-content {
