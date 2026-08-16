@@ -245,15 +245,20 @@ def _parse_llm_response(response_text: str) -> List[Dict[str, Any]]:
     return validated
 
 
+# OpenRouter base URL (OpenAI-compatible)
+_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+
 def score_candidates(
     candidates: List[CandidateWindow],
     api_key: Optional[str] = None,
-    model: str = "claude-sonnet-4-5-20251001",  # Claude Sonnet 4.6 (Anthropic API name)
+    model: str = "anthropic/claude-sonnet-4-5",  # OpenRouter model route for Claude Sonnet
     batch_size: int = 20,
     verbose: bool = False,
 ) -> List[ScoredClip]:
     """
-    Score *candidates* using the Anthropic API and return :class:`ScoredClip` list.
+    Score *candidates* using OpenRouter (OpenAI-compatible API) and return
+    :class:`ScoredClip` list.
 
     The candidates are sent in batches (default 20) to stay within context limits.
     Each batch is one API call.
@@ -263,9 +268,10 @@ def score_candidates(
     candidates:
         Output of :func:`generate_candidates`.
     api_key:
-        Anthropic API key.  Falls back to ``ANTHROPIC_API_KEY`` env var.
+        OpenRouter API key.  Falls back to ``OPENROUTER_API_KEY`` env var.
     model:
-        Anthropic model identifier.
+        OpenRouter model route, e.g. ``anthropic/claude-sonnet-4-5``.
+        See https://openrouter.ai/models for available routes.
     batch_size:
         Number of candidates per API call.
     verbose:
@@ -276,22 +282,26 @@ def score_candidates(
     RuntimeError
         If the API key is missing or the API call fails after retries.
     """
-    key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
+    key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
     if not key:
         raise RuntimeError(
-            "ANTHROPIC_API_KEY is not set.\n"
-            "Add it to your .env file or export it:  export ANTHROPIC_API_KEY=sk-ant-..."
+            "OPENROUTER_API_KEY is not set.\n"
+            "Add it to your .env file:  OPENROUTER_API_KEY=sk-or-v1-...\n"
+            "Get a key at https://openrouter.ai/keys"
         )
 
     try:
-        import anthropic  # type: ignore
+        from openai import OpenAI  # type: ignore
     except ImportError:
         raise RuntimeError(
-            "anthropic package is not installed.\n"
-            "Install it with:  pip install anthropic"
+            "openai package is not installed.\n"
+            "Install it with:  pip install openai"
         )
 
-    client = anthropic.Anthropic(api_key=key)
+    client = OpenAI(
+        api_key=key,
+        base_url=_OPENROUTER_BASE_URL,
+    )
 
     # Build an index for quick lookup
     candidate_map: Dict[int, CandidateWindow] = {c.index: c for c in candidates}
@@ -302,7 +312,7 @@ def score_candidates(
         batch = candidates[batch_start : batch_start + batch_size]
         if verbose:
             print(f"[score] Scoring batch {batch_start // batch_size + 1} "
-                  f"({len(batch)} candidates) ...")
+                  f"({len(batch)} candidates) via OpenRouter ({model}) ...")
 
         segments_json = _build_segments_payload(batch)
         user_msg = _SCORE_USER_TEMPLATE.format(
@@ -314,13 +324,15 @@ def score_candidates(
         last_error: Optional[Exception] = None
         for attempt in range(3):
             try:
-                response = client.messages.create(
+                response = client.chat.completions.create(
                     model=model,
                     max_tokens=4096,
-                    system=_SCORE_SYSTEM_PROMPT,
-                    messages=[{"role": "user", "content": user_msg}],
+                    messages=[
+                        {"role": "system", "content": _SCORE_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_msg},
+                    ],
                 )
-                response_text = response.content[0].text
+                response_text = response.choices[0].message.content or ""
                 scores = _parse_llm_response(response_text)
                 for s in scores:
                     all_scores[s["index"]] = s
@@ -333,17 +345,19 @@ def score_candidates(
                 break
             except Exception as e:
                 err_str = str(e)
-                if "rate" in err_str.lower() or "overloaded" in err_str.lower():
+                if "rate" in err_str.lower() or "429" in err_str or "overloaded" in err_str.lower():
                     wait = 10 * (attempt + 1)
                     print(f"[score] Rate limited. Waiting {wait}s before retry ...")
                     time.sleep(wait)
                     last_error = e
                 else:
-                    raise RuntimeError(f"Anthropic API error: {e}") from e
+                    raise RuntimeError(f"OpenRouter API error: {e}") from e
 
-        if last_error and isinstance(last_error, Exception) and "rate" in str(last_error).lower():
+        if last_error and isinstance(last_error, Exception) and (
+            "rate" in str(last_error).lower() or "429" in str(last_error)
+        ):
             raise RuntimeError(
-                f"Anthropic API rate limit exceeded after retries: {last_error}"
+                f"OpenRouter rate limit exceeded after retries: {last_error}"
             )
 
     # Assemble ScoredClip objects

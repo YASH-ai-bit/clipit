@@ -7,8 +7,11 @@ faster-whisper>=1.0.0
 # Video downloading
 yt-dlp>=2024.1.1
 
-# LLM scoring
-anthropic>=0.30.0
+# LLM scoring via OpenRouter (OpenAI-compatible)
+openai>=1.0.0
 
 # Environment variable management
 python-dotenv>=1.0.0
+
+# Development / testing
+pytest>=7.0.0
