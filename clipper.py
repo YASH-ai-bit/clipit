@@ -79,8 +79,14 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch the ultra-minimal Web UI dashboard on http://localhost:8000.",
+    )
+    parser.add_argument(
         "--input", "-i",
-        required=True,
+        required=False,
+        default=None,
         help="Local video file path or YouTube/Twitch URL.",
     )
     parser.add_argument(
@@ -273,6 +279,17 @@ def run(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.ui:
+        import uvicorn
+        print("\n" + "=" * 55)
+        print("  Auto-Clipper Web UI starting on http://localhost:8000")
+        print("=" * 55 + "\n")
+        uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)
+        return
+
+    if not args.input:
+        parser.error("the following arguments are required: --input / -i (or use --ui to launch the web dashboard)")
 
     # Basic validation
     if args.num_clips < 1:

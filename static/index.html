@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto-Clipper — AI Long-to-Short Video Engine</title>
+  <meta name="description" content="Turn long videos into viral 9:16 vertical social media clips with animated captions and AI scoring.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="background-glow"></div>
+
+  <!-- Header -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <span class="brand-icon">🎬</span>
+        <span class="brand-name">auto-clipper</span>
+        <span class="badge badge-subtle">v1.0</span>
+      </div>
+      <div class="nav-status">
+        <span class="status-dot"></span>
+        <span class="status-text">Pipeline Ready</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+    <!-- Hero Header -->
+    <section class="hero-section">
+      <h1 class="hero-title">Transform Long Videos into <span class="gradient-text">Viral Short Clips</span></h1>
+      <p class="hero-subtitle">Automatic transcription, AI moment scoring, 9:16 vertical reframing, and animated burned-in captions in one click.</p>
+    </section>
+
+    <!-- Generator Control Card -->
+    <section class="card input-card">
+      <!-- Input Mode Switcher -->
+      <div class="tab-group">
+        <button id="tab-url" class="tab-btn active" onclick="switchInputMode('url')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          YouTube / Twitch URL
+        </button>
+        <button id="tab-file" class="tab-btn" onclick="switchInputMode('file')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload Local Video
+        </button>
+      </div>
+
+      <!-- URL Input Form -->
+      <div id="url-input-container" class="input-pane">
+        <div class="input-wrapper">
+          <input type="url" id="video-url" class="text-input" placeholder="Paste YouTube or Twitch URL (e.g. https://www.youtube.com/watch?v=...)" autocomplete="off">
+          <button class="clear-btn" onclick="document.getElementById('video-url').value=''">✕</button>
+        </div>
+      </div>
+
+      <!-- File Upload Form -->
+      <div id="file-input-container" class="input-pane hidden">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-upload').click()">
+          <input type="file" id="file-upload" class="hidden-file-input" accept="video/mp4,video/mkv,video/quicktime,video/webm" onchange="handleFileSelect(event)">
+          <div class="dropzone-content">
+            <svg class="dropzone-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
+            <p class="dropzone-text" id="dropzone-label">Click or drag & drop a video file here (.mp4, .mov, .mkv)</p>
+            <span class="dropzone-hint" id="dropzone-hint">Preserves original quality and synchronized audio</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Row -->
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label class="setting-label" for="num-clips">Clips to Generate</label>
+          <select id="num-clips" class="select-input">
+            <option value="1">1 Clip</option>
+            <option value="3" selected>3 Clips</option>
+            <option value="5">5 Clips</option>
+            <option value="7">7 Clips</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label" for="max-duration">Max Duration</label>
+          <select id="max-duration" class="select-input">
+            <option value="5">First 5 min (Fast)</option>
+            <option value="10" selected>First 10 min</option>
+            <option value="20">First 20 min</option>
+            <option value="">Full Video</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label" for="whisper-model">Whisper Model</label>
+          <select id="whisper-model" class="select-input">
+            <option value="base" selected>Base (Fast & Reliable)</option>
+            <option value="tiny">Tiny (Ultra-Fast)</option>
+            <option value="small">Small (Higher Accuracy)</option>
+            <option value="medium">Medium (Studio Grade)</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label class="setting-label" for="llm-model">AI Scoring Model</label>
+          <select id="llm-model" class="select-input">
+            <option value="openai/gpt-4o-mini" selected>ChatGPT 4o-Mini (~$0.0005/run)</option>
+            <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (100% Free)</option>
+            <option value="deepseek/deepseek-chat">DeepSeek V3 (~$0.0004/run)</option>
+            <option value="openai/gpt-4o">ChatGPT 4o</option>
+            <option value="anthropic/claude-sonnet-4-5">Claude 3.5 Sonnet</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div class="action-bar">
+        <button id="generate-btn" class="btn-primary" onclick="startGeneration()">
+          <span class="btn-text">Generate Vertical Clips</span>
+          <span class="btn-icon">⚡</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Pipeline Progress Section (Hidden when idle) -->
+    <section id="progress-card" class="card progress-card hidden">
+      <div class="progress-header">
+        <div class="progress-title-group">
+          <div class="spinner"></div>
+          <div>
+            <h3 class="progress-step-title" id="progress-step-title">Processing video...</h3>
+            <p class="progress-step-desc" id="progress-step-desc">Pipeline is executing step-by-step</p>
+          </div>
+        </div>
+        <span class="progress-percentage" id="progress-percentage">0%</span>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-bar-fill" style="width: 5%;"></div>
+      </div>
+
+      <!-- Step Indicators -->
+      <div class="pipeline-steps">
+        <div class="step-badge" id="step-download"><span class="step-num">1</span> Media Prep</div>
+        <div class="step-badge" id="step-transcribe"><span class="step-num">2</span> Whisper AI</div>
+        <div class="step-badge" id="step-candidates"><span class="step-num">3</span> Moments</div>
+        <div class="step-badge" id="step-score"><span class="step-num">4</span> LLM Scoring</div>
+        <div class="step-badge" id="step-render"><span class="step-num">5</span> 9:16 Render</div>
+      </div>
+
+      <!-- Live Log Stream (Collapsible) -->
+      <details class="log-details" open>
+        <summary class="log-summary">Pipeline Execution Logs</summary>
+        <div class="log-terminal" id="log-terminal">
+          <div class="log-line text-muted">[System] Ready. Waiting for pipeline start...</div>
+        </div>
+      </details>
+    </section>
+
+    <!-- Clips Gallery Section -->
+    <section class="gallery-section">
+      <div class="gallery-header">
+        <div>
+          <h2 class="gallery-title">Generated Clips</h2>
+          <p class="gallery-subtitle">9:16 Vertical video with animated captions & ready-to-post copy</p>
+        </div>
+        <button class="btn-secondary" onclick="loadClips(true)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          Refresh
+        </button>
+      </div>
+
+      <!-- Clips Grid -->
+      <div id="clips-grid" class="clips-grid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-gallery" class="empty-state hidden">
+        <div class="empty-icon">🎞️</div>
+        <h3 class="empty-title">No clips generated yet</h3>
+        <p class="empty-desc">Paste a YouTube link or upload a local video above to create your first set of vertical clips.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden">
+    <span id="toast-message">Message</span>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

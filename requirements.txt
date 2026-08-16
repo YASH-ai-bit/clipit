@@ -13,5 +13,10 @@ openai>=1.0.0
 # Environment variable management
 python-dotenv>=1.0.0
 
+# Web UI server
+fastapi>=0.110.0
+uvicorn>=0.28.0
+python-multipart>=0.0.9
+
 # Development / testing
 pytest>=7.0.0
