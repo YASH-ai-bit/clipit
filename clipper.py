@@ -23,6 +23,15 @@ import time
 from pathlib import Path
 
 
+# Configure UTF-8 encoding on standard streams if possible
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Load .env if present (non-fatal if python-dotenv is not installed)
 # ---------------------------------------------------------------------------
@@ -42,11 +51,12 @@ def _load_dotenv() -> None:
 
 def _print_step(msg: str) -> None:
     """Print a formatted pipeline step message."""
-    print(f"\n▶  {msg}")
+    print(f"\n[>] {msg}")
 
 
 def _print_done(msg: str) -> None:
-    print(f"   ✓ {msg}")
+    print(f"    + {msg}")
+
 
 
 def _fatal(msg: str, code: int = 1) -> None:
@@ -247,12 +257,12 @@ def run(args: argparse.Namespace) -> None:
     )
 
     # ── 7. Summary ──────────────────────────────────────────────────────────
-    print(f"\n{'─'*50}")
+    print(f"\n{'-'*50}")
     print(f"  Completed successfully.")
     print(f"  {len(rendered)} clip(s) saved to: {output_dir.resolve()}")
-    print(f"{'─'*50}")
+    print(f"{'-'*50}")
     for mp4, txt in rendered:
-        print(f"  • {mp4.name}  +  {txt.name}")
+        print(f"  * {mp4.name}  +  {txt.name}")
     print()
 
 

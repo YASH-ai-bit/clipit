@@ -1,7 +1,7 @@
 """
 tests/test_render.py — Unit tests for render.py
 
-Tests caption escaping, word grouping, output naming, and ffmpeg detection.
+Tests ASS subtitle formatting, word grouping, output naming, and ASS content generation.
 Does NOT require ffmpeg or a real video file.
 """
 
@@ -12,9 +12,9 @@ import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from render import (
-    _escape_drawtext,
+    _format_ass_time,
     _build_word_groups,
-    _drawtext_filters_for_clip,
+    generate_ass_content,
 )
 from score import ScoredClip
 
@@ -34,46 +34,24 @@ def _make_words(texts, start_offset=0.0, word_duration=0.5, gap=0.1):
 
 
 # ---------------------------------------------------------------------------
-# _escape_drawtext
+# _format_ass_time
 # ---------------------------------------------------------------------------
 
-class TestEscapeDrawtext:
-    def test_plain_text(self):
-        assert _escape_drawtext("Hello world") == "Hello world"
+class TestFormatAssTime:
+    def test_zero(self):
+        assert _format_ass_time(0.0) == "0:00:00.00"
 
-    def test_colon_escaped(self):
-        result = _escape_drawtext("time: 10:30")
-        assert "\\:" in result
+    def test_seconds(self):
+        assert _format_ass_time(5.50) == "0:00:05.50"
 
-    def test_backslash_doubled(self):
-        result = _escape_drawtext("back\\slash")
-        assert "\\\\" in result
+    def test_minutes(self):
+        assert _format_ass_time(65.25) == "0:01:05.25"
 
-    def test_apostrophe_replaced(self):
-        # Apostrophes are converted to right-single-quote (safe unicode)
-        result = _escape_drawtext("don't")
-        assert "'" not in result  # raw apostrophe removed/replaced
+    def test_hours(self):
+        assert _format_ass_time(3661.12) == "1:01:01.12"
 
-    def test_square_brackets_escaped(self):
-        result = _escape_drawtext("value[0]")
-        assert "\\[" in result
-        assert "\\]" in result
-
-    def test_comma_escaped(self):
-        result = _escape_drawtext("a,b,c")
-        assert "\\," in result
-
-    def test_equals_escaped(self):
-        result = _escape_drawtext("key=value")
-        assert "\\=" in result
-
-    def test_empty_string(self):
-        assert _escape_drawtext("") == ""
-
-    def test_unicode_passthrough(self):
-        # Normal unicode should pass through
-        result = _escape_drawtext("héllo wörld")
-        assert "héllo" in result
+    def test_negative_clamped(self):
+        assert _format_ass_time(-5.0) == "0:00:00.00"
 
 
 # ---------------------------------------------------------------------------
@@ -106,51 +84,40 @@ class TestBuildWordGroups:
     def test_last_group_smaller_than_group_size(self):
         words = _make_words(["a", "b", "c", "d", "e"])
         groups = _build_word_groups(words, clip_start=0.0, words_per_group=4)
-        # 5 words with group_size=4 → 2 groups: [4] + [1]
         assert len(groups) == 2
         _, _, text2, _ = groups[1]
         assert text2 == "e"
 
 
 # ---------------------------------------------------------------------------
-# _drawtext_filters_for_clip
+# generate_ass_content
 # ---------------------------------------------------------------------------
 
-class TestDrawtextFilters:
-    def test_returns_list_of_strings(self):
-        words = _make_words(["hello", "world", "test", "clip"])
-        filters = _drawtext_filters_for_clip(words, clip_start=0.0)
-        assert isinstance(filters, list)
-        assert all(isinstance(f, str) for f in filters)
-
-    def test_empty_words_returns_empty(self):
-        filters = _drawtext_filters_for_clip([], clip_start=0.0)
-        assert filters == []
-
-    def test_filters_contain_drawtext(self):
+class TestGenerateAssContent:
+    def test_header_present(self):
         words = _make_words(["hello", "world"])
-        filters = _drawtext_filters_for_clip(words, clip_start=0.0)
-        assert any("drawtext" in f for f in filters)
+        content = generate_ass_content(words, clip_start=0.0)
+        assert "[Script Info]" in content
+        assert "[V4+ Styles]" in content
+        assert "[Events]" in content
 
-    def test_no_unescaped_apostrophe_in_filter(self):
-        words = _make_words(["don't", "stop"])
-        filters = _drawtext_filters_for_clip(words, clip_start=0.0)
-        for f in filters:
-            # The filter value should not contain a raw single-quote
-            # (they should be replaced with unicode right-quote)
-            # We check there's no "text='...'" containing raw '
-            # by looking for the problematic pattern
-            if "drawtext=text='" in f:
-                inner_start = f.index("drawtext=text='") + len("drawtext=text='")
-                # Find the closing quote
-                inner_end = f.index("'", inner_start)
-                inner = f[inner_start:inner_end]
-                assert "'" not in inner, f"Raw apostrophe found in: {f}"
+    def test_dialogue_events_generated(self):
+        words = _make_words(["one", "two", "three"])
+        content = generate_ass_content(words, clip_start=0.0)
+        assert "Dialogue: 0," in content
 
-    def test_enable_clause_present(self):
-        words = _make_words(["visible", "when", "speaking"])
-        filters = _drawtext_filters_for_clip(words, clip_start=0.0)
-        assert any("enable=" in f for f in filters)
+    def test_word_highlight_tags(self):
+        words = _make_words(["hello", "world"])
+        content = generate_ass_content(words, clip_start=0.0)
+        # Yellow color tag
+        assert r"{\c&H0000FFFF&}" in content
+        # White color tag
+        assert r"{\c&H00FFFFFF&}" in content
+
+    def test_empty_words_produces_valid_ass(self):
+        content = generate_ass_content([], clip_start=0.0)
+        assert "[Script Info]" in content
+        assert "Dialogue:" not in content
 
 
 # ---------------------------------------------------------------------------

@@ -1,11 +1,12 @@
 """
-render.py — Video processing, 9:16 conversion, and caption burning via ffmpeg.
+render.py — Video processing, 9:16 vertical conversion, and dynamic caption burning via ffmpeg & libass.
 
 Design decisions:
-- ffmpeg is invoked via subprocess for reliability and no extra dependencies.
-- Captions are burned in as word groups using ffmpeg drawtext filters.
-- Each clip is processed independently so failures don't affect other clips.
-- The 9:16 transformation uses centered crop + blur pad to preserve content.
+- Captions are burned in using Advanced SubStation Alpha (ASS) subtitles with libass.
+  This provides bulletproof cross-platform rendering (no fontconfig crashes on Windows),
+  dynamic word-by-word highlight effects (karaoke-style), and crisp outlines.
+- ffmpeg is invoked via subprocess for reliability and zero extra wrapper dependencies.
+- The 9:16 transformation scales and crops the original video centered.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import List, Tuple, Optional
 
@@ -31,11 +33,9 @@ TARGET_H = 1920
 
 # Caption config
 WORDS_PER_GROUP = 4          # words shown per caption frame
-FONT_SIZE = 72               # drawtext font size
-CAPTION_Y_FRACTION = 0.75    # vertical position as fraction of height
-FONT_COLOR = "white"
-HIGHLIGHT_COLOR = "yellow"   # color for the currently-spoken word
-BOX_COLOR = "black@0.45"     # semi-transparent background box
+FONT_NAME = "Arial"
+FONT_SIZE = 64               # ASS font size for 1080x1920 canvas
+MARGIN_V = 280               # bottom margin (lower third placement)
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ def check_ffmpeg() -> str:
         raise RuntimeError(
             "ffmpeg is not installed or not on PATH.\n"
             "Install it from https://ffmpeg.org/download.html and ensure it is on PATH.\n"
-            "On Windows you can also install via:  winget install Gyan.FFmpeg"
+            "On Windows you can install via:  winget install Gyan.FFmpeg"
         )
     return path
 
@@ -62,7 +62,7 @@ def _run_ffmpeg(args: List[str], verbose: bool = False) -> None:
     """
     cmd = ["ffmpeg", "-y"] + args
     if verbose:
-        print(f"[render] ffmpeg {' '.join(args[:6])} ...")
+        print(f"[render] ffmpeg {' '.join(args[:8])} ...")
 
     result = subprocess.run(
         cmd,
@@ -80,31 +80,22 @@ def _run_ffmpeg(args: List[str], verbose: bool = False) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Caption helpers
+# ASS Subtitle Generation (Dynamic Word Highlight)
 # ---------------------------------------------------------------------------
 
-def _escape_drawtext(text: str) -> str:
+def _format_ass_time(seconds: float) -> str:
     """
-    Escape a string for safe use inside an ffmpeg drawtext filter value.
-
-    ffmpeg drawtext uses its own escaping rules:
-      - Backslash must be doubled: \\ → \\\\
-      - Single-quote must be escaped: ' → \\'
-      - Colon must be escaped: : → \\:
-    We also strip characters that commonly break filter chains.
+    Format *seconds* into ASS timestamp format: H:MM:SS.cs (centiseconds).
     """
-    # Replace backslash first (before adding new backslashes)
-    text = text.replace("\\", "\\\\")
-    text = text.replace("'", "\u2019")   # Replace apostrophe with right single quote (unicode, safe)
-    text = text.replace(":", "\\:")
-    text = text.replace("[", "\\[")
-    text = text.replace("]", "\\]")
-    text = text.replace(",", "\\,")
-    text = text.replace(";", "\\;")
-    text = text.replace("=", "\\=")
-    # Remove control characters
-    text = re.sub(r"[\x00-\x1f\x7f]", "", text)
-    return text
+    seconds = max(0.0, float(seconds))
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    centis = int(round((seconds - int(seconds)) * 100))
+    if centis >= 100:
+        secs += 1
+        centis = 0
+    return f"{hours}:{minutes:02d}:{secs:02d}.{centis:02d}"
 
 
 def _build_word_groups(
@@ -124,76 +115,64 @@ def _build_word_groups(
     groups = []
     for i in range(0, len(words), words_per_group):
         chunk = words[i : i + words_per_group]
-        group_start = chunk[0]["start"] - clip_start
-        group_end = chunk[-1]["end"] - clip_start
+        group_start = max(0.0, chunk[0]["start"] - clip_start)
+        group_end = max(group_start + 0.05, chunk[-1]["end"] - clip_start)
         group_text = " ".join(w["word"] for w in chunk)
-        groups.append((max(0.0, group_start), max(0.0, group_end), group_text, chunk))
+        groups.append((group_start, group_end, group_text, chunk))
 
     return groups
 
 
-def _drawtext_filters_for_clip(
+def generate_ass_content(
     words: List[WordEntry],
     clip_start: float,
-    video_w: int = TARGET_W,
-    video_h: int = TARGET_H,
-) -> List[str]:
+    font_name: str = FONT_NAME,
+    font_size: int = FONT_SIZE,
+    margin_v: int = MARGIN_V,
+) -> str:
     """
-    Build a list of ffmpeg drawtext filter strings for the given clip words.
-
-    Each word group gets a background box + text filter.
-    The currently-speaking word gets an additional highlighted overlay.
+    Generate an Advanced SubStation Alpha (.ass) subtitle file content with
+    word-level dynamic highlight effects (active word highlighted in yellow).
     """
-    filters: List[str] = []
-    groups = _build_word_groups(words, clip_start)
-    y_pos = int(video_h * CAPTION_Y_FRACTION)
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {TARGET_W}
+PlayResY: {TARGET_H}
+ScaledBorderAndShadow: yes
 
-    for group_start, group_end, group_text, chunk in groups:
-        escaped_text = _escape_drawtext(group_text)
-        if not escaped_text.strip():
-            continue
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,{font_name},{font_size},&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,2,2,40,40,{margin_v},1
 
-        # Enable condition: show only during this group's time window
-        enable = f"between(t\\,{group_start:.3f}\\,{group_end:.3f})"
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    events = []
+    groups = _build_word_groups(words, clip_start=clip_start)
 
-        # Background box (drawn behind text via box=1)
-        filters.append(
-            f"drawtext=text='{escaped_text}'"
-            f":fontsize={FONT_SIZE}"
-            f":fontcolor={FONT_COLOR}"
-            f":box=1:boxcolor={BOX_COLOR}:boxborderw=12"
-            f":x=(w-text_w)/2:y={y_pos}"
-            f":enable='{enable}'"
-        )
+    for _, _, _, chunk in groups:
+        for active_idx, active_word in enumerate(chunk):
+            word_start = max(0.0, active_word["start"] - clip_start)
+            word_end = max(word_start + 0.05, active_word["end"] - clip_start)
 
-        # Per-word highlight: draw individual words in yellow at the exact x offset.
-        # This is approximate because ffmpeg drawtext has limited text-metric access.
-        # We use a second drawtext overlay with the word text on a transparent bg.
-        for word_idx, w in enumerate(chunk):
-            word_text = _escape_drawtext(w["word"])
-            if not word_text.strip():
-                continue
-            word_start = max(0.0, w["start"] - clip_start)
-            word_end = max(word_start + 0.05, w["end"] - clip_start)
-            word_enable = f"between(t\\,{word_start:.3f}\\,{word_end:.3f})"
+            # Build line with current word highlighted in yellow (&H0000FFFF&) and others in white (&H00FFFFFF&)
+            line_parts = []
+            for j, w in enumerate(chunk):
+                # Clean up word text for ASS (strip braces / backslashes)
+                w_text = w["word"].replace("{", "").replace("}", "").replace("\\", "")
+                if not w_text:
+                    continue
+                if j == active_idx:
+                    line_parts.append(f"{{\\c&H0000FFFF&}}{w_text}{{\\c&H00FFFFFF&}}")
+                else:
+                    line_parts.append(w_text)
 
-            # Approximate x offset: prefix chars * half font size from center
-            # This is intentionally approximate — ffmpeg has no text-metrics API
-            prefix = " ".join(_escape_drawtext(chunk[i]["word"]) for i in range(word_idx))
-            if prefix:
-                x_expr = f"(w-text_w)/2+(({len(prefix)})*{FONT_SIZE//2})"
-            else:
-                x_expr = "(w-text_w)/2"
+            dialogue_text = " ".join(line_parts)
+            start_str = _format_ass_time(word_start)
+            end_str = _format_ass_time(word_end)
+            events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{dialogue_text}")
 
-            filters.append(
-                f"drawtext=text='{word_text}'"
-                f":fontsize={FONT_SIZE}"
-                f":fontcolor={HIGHLIGHT_COLOR}"
-                f":x={x_expr}:y={y_pos}"
-                f":enable='{word_enable}'"
-            )
-
-    return filters
+    return header + "\n".join(events) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +186,7 @@ def render_clip(
     verbose: bool = False,
 ) -> None:
     """
-    Cut, reframe to 9:16, add captions, and encode *clip* from *source_video*.
+    Cut, reframe to 9:16, add word-highlighted captions, and encode *clip* from *source_video*.
 
     Parameters
     ----------
@@ -229,34 +208,25 @@ def render_clip(
     duration = clip.duration
     words = clip.words
 
-    # 1. Build caption filter chain
-    caption_filters = _drawtext_filters_for_clip(words, clip_start=start)
+    # Create temporary .ass subtitle file
+    ass_path = output_path.with_suffix(".temp.ass")
+    has_captions = bool(words)
 
-    # 2. Build the full ffmpeg filtergraph
-    #
-    # The pipeline is:
-    #   [0:v] → scale to cover 1080×1920 → crop center → blur-pad → captions → [vout]
-    #   [0:a] → copy → [aout]
-    #
-    # We use the "scale2ref" approach:
-    #   - Scale so the shorter dimension fits 1080 (for landscape source),
-    #     or the longer dimension fits 1920 (for portrait source).
-    #   Actually, we use a simpler + safer approach:
-    #   - Scale to fill: scale=w=max(W, H*9/16):h=max(H, W*16/9) then crop.
-    #
-    # Simpler robust approach for a hackathon:
-    #   scale to height=1920, then crop width=1080 from center.
-    #   If the source is already taller than wide, scale to width=1080 first.
+    if has_captions:
+        ass_content = generate_ass_content(words, clip_start=start)
+        ass_path.write_text(ass_content, encoding="utf-8")
 
+    # Build filtergraph: scale + crop to 9:16 vertical
     vf_parts = [
-        # Scale so that height is at least 1920 (preserving aspect)
         f"scale={TARGET_W}:{TARGET_H}:force_original_aspect_ratio=increase",
-        # Crop the center 1080×1920
         f"crop={TARGET_W}:{TARGET_H}",
     ]
 
-    # Add caption drawtext filters
-    vf_parts.extend(caption_filters)
+    # Add ASS subtitles filter if captions are present
+    if has_captions:
+        # ffmpeg requires escaping backslashes and colons on Windows
+        escaped_ass = ass_path.resolve().as_posix().replace(":", r"\:").replace("'", r"\'")
+        vf_parts.append(f"ass=filename='{escaped_ass}'")
 
     vf = ",".join(vf_parts)
 
@@ -276,7 +246,15 @@ def render_clip(
         str(output_path),
     ]
 
-    _run_ffmpeg(args, verbose=verbose)
+    try:
+        _run_ffmpeg(args, verbose=verbose)
+    finally:
+        # Clean up temporary ASS file
+        if ass_path.exists():
+            try:
+                ass_path.unlink()
+            except OSError:
+                pass
 
 
 def render_all_clips(
@@ -298,7 +276,7 @@ def render_all_clips(
         mp4_path = output_dir / f"{label}.mp4"
         txt_path = output_dir / f"{label}.txt"
 
-        print(f"Rendering clip {i} of {len(clips)}: [{clip.start:.1f}s – {clip.end:.1f}s] ...")
+        print(f"Rendering clip {i} of {len(clips)}: [{clip.start:.1f}s - {clip.end:.1f}s] ...")
 
         try:
             render_clip(
@@ -316,7 +294,7 @@ def render_all_clips(
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write(f"Title: {clip.title}\n\n")
                 f.write(f"Caption: {clip.caption}\n\n")
-                f.write(f"Timestamp: {clip.start:.1f}s – {clip.end:.1f}s\n")
+                f.write(f"Timestamp: {clip.start:.1f}s - {clip.end:.1f}s\n")
                 f.write(f"Score: {clip.score:.1f}/10\n")
                 if clip.reasoning:
                     f.write(f"Reasoning: {clip.reasoning}\n")
@@ -324,13 +302,12 @@ def render_all_clips(
             print(f"  [!] Could not write {txt_path}: {e}", file=sys.stderr)
 
         results.append((mp4_path, txt_path))
-        print(f"  ✓ Saved: {mp4_path.name}")
+        print(f"  + Saved: {mp4_path.name}")
 
     return results
 
 
 if __name__ == "__main__":
-    """Quick smoke-test: render a 5-second clip from a local video."""
     import sys
     from pathlib import Path as P
 
@@ -344,8 +321,6 @@ if __name__ == "__main__":
     start = float(sys.argv[2]) if len(sys.argv) > 2 else 0.0
     end   = float(sys.argv[3]) if len(sys.argv) > 3 else start + 10.0
 
-    # Fake clip with no captions for smoke test
-    from score import ScoredClip
     test_clip = ScoredClip(
         index=0, start=start, end=end, words=[],
         score=9.0, title="Test Clip", caption="Generated by render.py smoke test",
