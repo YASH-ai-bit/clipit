@@ -99,8 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--llm-model",
         default=None,
         help=(
-            "OpenRouter LLM model route for scoring (default: google/gemini-2.0-flash-001, "
-            "or OPENROUTER_MODEL env var). Ultra-cheap & fast."
+            "OpenRouter LLM model route for scoring (default: openai/gpt-4o-mini, "
+            "or OPENROUTER_MODEL env var)."
         ),
     )
     parser.add_argument(

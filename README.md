@@ -110,8 +110,8 @@ With just **$1 of OpenRouter credits**, you can process thousands of videos by c
 
 | Model | Cost per Run (~20 segments) | Runs per $1 Credit |
 |-------|----------------------------|--------------------|
-| `google/gemini-2.0-flash-001` *(Default)* | **~$0.0003** | **~3,300 runs** |
-| `openai/gpt-4o-mini` | **~$0.0005** | **~2,000 runs** |
+| `openai/gpt-4o-mini` *(Default)* | **~$0.0005** | **~2,000 runs** |
+| `openai/gpt-4o` | **~$0.008** | **~125 runs** |
 | `meta-llama/llama-3.3-70b-instruct:free` | **$0.00** | **Unlimited (Free)** |
 | `anthropic/claude-sonnet-4-5` | **~$0.010** | **~100 runs** |
 

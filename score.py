@@ -181,8 +181,8 @@ SEGMENTS:
 """
 
 
-# Default model on OpenRouter: Gemini 2.0 Flash is ultra-fast, high quality, and extremely cheap ($0.10 / 1M tokens)
-DEFAULT_OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
+# Default model on OpenRouter: GPT-4o Mini (ChatGPT) is super reliable, fast, and very cheap ($0.15 / 1M tokens)
+DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 
 
 def _build_segments_payload(candidates: List[CandidateWindow]) -> str:
@@ -275,7 +275,7 @@ def score_candidates(
         OpenRouter API key. Falls back to ``OPENROUTER_API_KEY`` env var.
     model:
         OpenRouter model route. Defaults to ``OPENROUTER_MODEL`` env var,
-        or ``google/gemini-2.0-flash-001`` ($0.10 / 1M tokens).
+        or ``openai/gpt-4o-mini`` ($0.15 / 1M tokens).
     batch_size:
         Number of candidates per API call.
     verbose:
