@@ -7,9 +7,11 @@ __pycache__/
 *.pyo
 venv/
 .venv/
+venv*/
 *.egg-info/
 dist/
 build/
+
 
 # Generated clips
 output/
