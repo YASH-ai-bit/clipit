@@ -181,18 +181,22 @@ SEGMENTS:
 """
 
 
+# Default model on OpenRouter: Gemini 2.0 Flash is ultra-fast, high quality, and extremely cheap ($0.10 / 1M tokens)
+DEFAULT_OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
+
+
 def _build_segments_payload(candidates: List[CandidateWindow]) -> str:
-    """Serialize candidates to a compact JSON string for the prompt."""
+    """Serialize candidates to a compact JSON string to minimize prompt tokens and cost."""
     payload = []
     for c in candidates:
         payload.append({
             "index": c.index,
-            "start_seconds": round(c.start, 1),
-            "end_seconds": round(c.end, 1),
-            "duration_seconds": round(c.duration, 1),
+            "start": round(c.start, 1),
+            "end": round(c.end, 1),
+            "duration": round(c.duration, 1),
             "transcript": c.text,
         })
-    return json.dumps(payload, indent=2)
+    return json.dumps(payload, separators=(",", ":"))
 
 
 def _parse_llm_response(response_text: str) -> List[Dict[str, Any]]:
@@ -252,7 +256,7 @@ _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 def score_candidates(
     candidates: List[CandidateWindow],
     api_key: Optional[str] = None,
-    model: str = "anthropic/claude-sonnet-4-5",  # OpenRouter model route for Claude Sonnet
+    model: Optional[str] = None,
     batch_size: int = 20,
     verbose: bool = False,
 ) -> List[ScoredClip]:
@@ -268,10 +272,10 @@ def score_candidates(
     candidates:
         Output of :func:`generate_candidates`.
     api_key:
-        OpenRouter API key.  Falls back to ``OPENROUTER_API_KEY`` env var.
+        OpenRouter API key. Falls back to ``OPENROUTER_API_KEY`` env var.
     model:
-        OpenRouter model route, e.g. ``anthropic/claude-sonnet-4-5``.
-        See https://openrouter.ai/models for available routes.
+        OpenRouter model route. Defaults to ``OPENROUTER_MODEL`` env var,
+        or ``google/gemini-2.0-flash-001`` ($0.10 / 1M tokens).
     batch_size:
         Number of candidates per API call.
     verbose:
@@ -282,6 +286,7 @@ def score_candidates(
     RuntimeError
         If the API key is missing or the API call fails after retries.
     """
+    resolved_model = model or os.environ.get("OPENROUTER_MODEL", DEFAULT_OPENROUTER_MODEL)
     key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
     if not key:
         raise RuntimeError(
@@ -312,7 +317,7 @@ def score_candidates(
         batch = candidates[batch_start : batch_start + batch_size]
         if verbose:
             print(f"[score] Scoring batch {batch_start // batch_size + 1} "
-                  f"({len(batch)} candidates) via OpenRouter ({model}) ...")
+                  f"({len(batch)} candidates) via OpenRouter ({resolved_model}) ...")
 
         segments_json = _build_segments_payload(batch)
         user_msg = _SCORE_USER_TEMPLATE.format(
@@ -325,8 +330,8 @@ def score_candidates(
         for attempt in range(3):
             try:
                 response = client.chat.completions.create(
-                    model=model,
-                    max_tokens=4096,
+                    model=resolved_model,
+                    max_tokens=2048,
                     messages=[
                         {"role": "system", "content": _SCORE_SYSTEM_PROMPT},
                         {"role": "user", "content": user_msg},

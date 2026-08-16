@@ -53,7 +53,7 @@ pip install -r requirements.txt
 
 ## Environment Setup
 
-Copy `.env.example` to `.env` and fill in your Anthropic API key:
+Copy `.env.example` to `.env` and fill in your OpenRouter API key:
 
 ```bash
 cp .env.example .env
@@ -61,15 +61,17 @@ cp .env.example .env
 
 Edit `.env`:
 ```
-ANTHROPIC_API_KEY=sk-ant-your-key-here
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+# Optional: choose scoring model (defaults to ultra-cheap Gemini 2.0 Flash)
+OPENROUTER_MODEL=google/gemini-2.0-flash-001
 ```
 
-Get an API key from: https://console.anthropic.com/
+Get an API key from: https://openrouter.ai/keys
 
 Alternatively, export the variable directly:
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-your-key-here   # macOS/Linux
-$env:ANTHROPIC_API_KEY="sk-ant-..."              # Windows PowerShell
+export OPENROUTER_API_KEY=sk-or-v1-your-key-here   # macOS/Linux
+$env:OPENROUTER_API_KEY="sk-or-v1-..."             # Windows PowerShell
 ```
 
 ---
@@ -96,22 +98,34 @@ python clipper.py --input "https://clips.twitch.tv/CLIP_ID"
 --num-clips, -n    Number of clips to generate (default: 5)
 --max-duration     Process only the first N minutes (default: full video)
 --model            Whisper model: tiny/base/small/medium/large-v2 (default: base)
+--llm-model        OpenRouter LLM model route (default: google/gemini-2.0-flash-001)
 --output-dir       Output directory (default: ./output)
 --no-cache         Force re-transcription (ignore cached transcript)
 --verbose          Show detailed ffmpeg/debug output
 ```
 
+### Cost-Effective Model Recommendations
+
+With just **$1 of OpenRouter credits**, you can process thousands of videos by choosing a lightweight model:
+
+| Model | Cost per Run (~20 segments) | Runs per $1 Credit |
+|-------|----------------------------|--------------------|
+| `google/gemini-2.0-flash-001` *(Default)* | **~$0.0003** | **~3,300 runs** |
+| `openai/gpt-4o-mini` | **~$0.0005** | **~2,000 runs** |
+| `meta-llama/llama-3.3-70b-instruct:free` | **$0.00** | **Unlimited (Free)** |
+| `anthropic/claude-sonnet-4-5` | **~$0.010** | **~100 runs** |
+
 ### Examples
 
 ```bash
-# Generate 3 clips from first 15 minutes of a YouTube video
-python clipper.py --input "https://youtu.be/EXAMPLE" --num-clips 3 --max-duration 15
+# Fast test: 3 clips from first 5 minutes using ultra-cheap default model
+python clipper.py --input "https://youtu.be/EXAMPLE" --num-clips 3 --max-duration 5
 
-# Use a more accurate model for better transcription
-python clipper.py --input lecture.mp4 --model small
+# Use a 100% free model on OpenRouter
+python clipper.py --input video.mp4 --llm-model "meta-llama/llama-3.3-70b-instruct:free"
 
-# Force re-transcription (useful if the source changed)
-python clipper.py --input podcast.mp4 --no-cache --verbose
+# Use GPT-4o Mini
+python clipper.py --input podcast.mp4 --llm-model "openai/gpt-4o-mini"
 ```
 
 ---

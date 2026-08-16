@@ -96,6 +96,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Whisper model size (default: base).  Larger = more accurate but slower.",
     )
     parser.add_argument(
+        "--llm-model",
+        default=None,
+        help=(
+            "OpenRouter LLM model route for scoring (default: google/gemini-2.0-flash-001, "
+            "or OPENROUTER_MODEL env var). Ultra-cheap & fast."
+        ),
+    )
+    parser.add_argument(
         "--output-dir",
         default="output",
         help="Directory for generated clips (default: ./output).",
@@ -202,7 +210,11 @@ def run(args: argparse.Namespace) -> None:
     _print_step("Scoring candidate segments...")
 
     try:
-        scored = score_candidates(candidates, verbose=args.verbose)
+        scored = score_candidates(
+            candidates,
+            model=args.llm_model,
+            verbose=args.verbose,
+        )
     except RuntimeError as e:
         _fatal(str(e))
     except Exception as e:
