@@ -1,0 +1,26 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Generated clips
+output/
+
+# Downloaded videos
+downloads/
+
+# Transcript caches
+*.transcript.json
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,14 @@
+# Auto-Clipper Runtime Dependencies
+# Python 3.9–3.12 recommended (3.13+ may require source compilation of some packages)
+
+# Transcription (requires Python <=3.12 for pre-built wheels of ctranslate2 + av)
+faster-whisper>=1.0.0
+
+# Video downloading
+yt-dlp>=2024.1.1
+
+# LLM scoring
+anthropic>=0.30.0
+
+# Environment variable management
+python-dotenv>=1.0.0
