@@ -1,57 +1,57 @@
 /**
- * app.js — Auto-Clipper Web UI Client Logic
+ * app.js — CLIPIT Ultra-Minimal Client Controller
  */
 
 let activeMode = 'url';
 let uploadedFilePath = null;
 let currentJobId = null;
-let pollInterval = null;
+let pollTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-  loadClips();
-  setupDragAndDrop();
+  fetchClips();
+  initDropzone();
 });
 
 // ---------------------------------------------------------------------------
-// Input Mode Switching
+// Mode Toggle (URL vs Local File)
 // ---------------------------------------------------------------------------
 
-function switchInputMode(mode) {
+function switchMode(mode) {
   activeMode = mode;
   const tabUrl = document.getElementById('tab-url');
   const tabFile = document.getElementById('tab-file');
-  const urlPane = document.getElementById('url-input-container');
-  const filePane = document.getElementById('file-input-container');
+  const urlBox = document.getElementById('url-box');
+  const fileBox = document.getElementById('file-box');
 
   if (mode === 'url') {
     tabUrl.classList.add('active');
     tabFile.classList.remove('active');
-    urlPane.classList.remove('hidden');
-    filePane.classList.add('hidden');
+    urlBox.classList.remove('hidden');
+    fileBox.classList.add('hidden');
   } else {
     tabFile.classList.add('active');
     tabUrl.classList.remove('active');
-    filePane.classList.remove('hidden');
-    urlPane.classList.add('hidden');
+    fileBox.classList.remove('hidden');
+    urlBox.classList.add('hidden');
   }
 }
 
 // ---------------------------------------------------------------------------
-// File Upload & Drag and Drop
+// File Dropzone
 // ---------------------------------------------------------------------------
 
-function setupDragAndDrop() {
+function initDropzone() {
   const dropzone = document.getElementById('dropzone');
 
-  ['dragenter', 'dragover'].forEach(name => {
-    dropzone.addEventListener(name, (e) => {
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropzone.addEventListener(evt, (e) => {
       e.preventDefault();
       dropzone.classList.add('dragover');
     });
   });
 
-  ['dragleave', 'drop'].forEach(name => {
-    dropzone.addEventListener(name, (e) => {
+  ['dragleave', 'drop'].forEach(evt => {
+    dropzone.addEventListener(evt, (e) => {
       e.preventDefault();
       dropzone.classList.remove('dragover');
     });
@@ -59,23 +59,20 @@ function setupDragAndDrop() {
 
   dropzone.addEventListener('drop', (e) => {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      uploadFile(e.dataTransfer.files[0]);
+      uploadVideoFile(e.dataTransfer.files[0]);
     }
   });
 }
 
-function handleFileSelect(e) {
+function handleFile(e) {
   if (e.target.files && e.target.files[0]) {
-    uploadFile(e.target.files[0]);
+    uploadVideoFile(e.target.files[0]);
   }
 }
 
-async function uploadFile(file) {
-  const label = document.getElementById('dropzone-label');
-  const hint = document.getElementById('dropzone-hint');
-
-  label.textContent = `Uploading ${file.name}...`;
-  hint.textContent = `File size: ${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+async function uploadVideoFile(file) {
+  const textEl = document.getElementById('dropzone-text');
+  textEl.textContent = `UPLOADING: ${file.name}...`;
 
   const formData = new FormData();
   formData.append('file', file);
@@ -85,56 +82,55 @@ async function uploadFile(file) {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error('File upload failed');
+    if (!res.ok) throw new Error('Upload failed');
 
     const data = await res.json();
     uploadedFilePath = data.local_path;
 
-    label.textContent = `✓ Selected: ${file.name}`;
-    hint.textContent = `Ready for clipping`;
-    showToast(`Uploaded ${file.name} successfully`);
+    textEl.textContent = `READY: ${file.name}`;
+    notify('FILE READY');
   } catch (err) {
-    label.textContent = 'Upload failed. Click to try again.';
-    hint.textContent = err.message;
-    showToast(`Upload error: ${err.message}`, true);
+    textEl.textContent = 'UPLOAD FAILED. RETRY.';
+    notify(`ERROR: ${err.message}`);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Start Clipping Pipeline
+// Trigger Clipping Pipeline
 // ---------------------------------------------------------------------------
 
-async function startGeneration() {
+async function startClipping() {
   let source = '';
 
   if (activeMode === 'url') {
     source = document.getElementById('video-url').value.trim();
     if (!source) {
-      showToast('Please enter a YouTube or Twitch URL', true);
+      notify('ENTER A VALID URL');
       return;
     }
   } else {
     if (!uploadedFilePath) {
-      showToast('Please select or upload a video file first', true);
+      notify('SELECT A VIDEO FILE');
       return;
     }
     source = uploadedFilePath;
   }
 
   const numClips = parseInt(document.getElementById('num-clips').value, 10);
-  const maxDurationRaw = document.getElementById('max-duration').value;
-  const maxDuration = maxDurationRaw ? parseFloat(maxDurationRaw) : null;
+  const maxDurationVal = document.getElementById('max-duration').value;
+  const maxDuration = maxDurationVal ? parseFloat(maxDurationVal) : null;
   const model = document.getElementById('whisper-model').value;
   const llmModel = document.getElementById('llm-model').value;
 
-  const btn = document.getElementById('generate-btn');
+  const btn = document.getElementById('clip-btn');
+  const btnText = document.getElementById('clip-btn-text');
   btn.disabled = true;
-  btn.querySelector('.btn-text').textContent = 'Processing Pipeline...';
+  btnText.textContent = 'PROCESSING...';
 
-  // Show progress card
-  const progressCard = document.getElementById('progress-card');
-  progressCard.classList.remove('hidden');
-  resetProgressUI();
+  // Show progress panel
+  const progressPanel = document.getElementById('progress-panel');
+  progressPanel.classList.remove('hidden');
+  resetProgressTrack();
 
   try {
     const res = await fetch('/api/clip', {
@@ -151,28 +147,27 @@ async function startGeneration() {
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.detail || 'Failed to start pipeline');
+      throw new Error(err.detail || 'Failed to start');
     }
 
     const data = await res.json();
     currentJobId = data.job_id;
 
-    // Start polling
-    if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(pollJobProgress, 1200);
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollJob, 1000);
 
   } catch (err) {
-    showToast(`Error starting job: ${err.message}`, true);
+    notify(`ERROR: ${err.message}`);
     btn.disabled = false;
-    btn.querySelector('.btn-text').textContent = 'Generate Vertical Clips';
+    btnText.textContent = 'CLIP';
   }
 }
 
 // ---------------------------------------------------------------------------
-// Progress Polling
+// Polling Pipeline Progress
 // ---------------------------------------------------------------------------
 
-async function pollJobProgress() {
+async function pollJob() {
   if (!currentJobId) return;
 
   try {
@@ -180,63 +175,61 @@ async function pollJobProgress() {
     if (!res.ok) return;
 
     const job = await res.json();
-    updateProgressUI(job);
+    updateProgressState(job);
 
     if (job.status === 'completed') {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      document.getElementById('generate-btn').disabled = false;
-      document.getElementById('generate-btn').querySelector('.btn-text').textContent = 'Generate Vertical Clips';
-      showToast('🎉 All clips rendered successfully!');
-      loadClips();
+      clearInterval(pollTimer);
+      pollTimer = null;
+      document.getElementById('clip-btn').disabled = false;
+      document.getElementById('clip-btn-text').textContent = 'CLIP';
+      notify('CLIPS GENERATED');
+      fetchClips();
     } else if (job.status === 'failed') {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      document.getElementById('generate-btn').disabled = false;
-      document.getElementById('generate-btn').querySelector('.btn-text').textContent = 'Generate Vertical Clips';
-      showToast(`Pipeline failed: ${job.error}`, true);
+      clearInterval(pollTimer);
+      pollTimer = null;
+      document.getElementById('clip-btn').disabled = false;
+      document.getElementById('clip-btn-text').textContent = 'CLIP';
+      notify(`FAILED: ${job.error}`);
     }
   } catch (err) {
-    console.error('Polling error:', err);
+    console.error('Poll error:', err);
   }
 }
 
-function resetProgressUI() {
-  document.getElementById('progress-percentage').textContent = '5%';
-  document.getElementById('progress-bar-fill').style.width = '5%';
-  document.getElementById('progress-step-title').textContent = 'Initializing pipeline...';
-  document.getElementById('progress-step-desc').textContent = 'Preparing video media';
+function resetProgressTrack() {
+  document.getElementById('progress-val').textContent = '5%';
+  document.getElementById('meter-fill').style.width = '5%';
+  document.getElementById('progress-step-text').textContent = 'INITIALIZING';
 
-  ['step-download', 'step-transcribe', 'step-candidates', 'step-score', 'step-render'].forEach(id => {
+  ['p-prep', 'p-transcribe', 'p-moments', 'p-score', 'p-render'].forEach(id => {
     const el = document.getElementById(id);
     el.classList.remove('active', 'done');
   });
-  document.getElementById('step-download').classList.add('active');
+  document.getElementById('p-prep').classList.add('active');
 
-  const term = document.getElementById('log-terminal');
-  term.innerHTML = '<div class="log-line text-muted">[System] Pipeline launched. Processing...</div>';
+  const logBox = document.getElementById('log-box');
+  logBox.innerHTML = '<div class="log-row text-dim">[00:00:00] Initializing pipeline...</div>';
 }
 
-function updateProgressUI(job) {
-  document.getElementById('progress-percentage').textContent = `${job.progress_pct}%`;
-  document.getElementById('progress-bar-fill').style.width = `${job.progress_pct}%`;
-  document.getElementById('progress-step-title').textContent = job.current_step;
+function updateProgressState(job) {
+  document.getElementById('progress-val').textContent = `${job.progress_pct}%`;
+  document.getElementById('meter-fill').style.width = `${job.progress_pct}%`;
+  document.getElementById('progress-step-text').textContent = (job.current_step || 'PROCESSING').toUpperCase();
 
-  // Step highlight logic
-  const stepMap = [
-    { id: 'step-download', min: 10, max: 29 },
-    { id: 'step-transcribe', min: 30, max: 54 },
-    { id: 'step-candidates', min: 55, max: 69 },
-    { id: 'step-score', min: 70, max: 84 },
-    { id: 'step-render', min: 85, max: 100 },
+  const nodes = [
+    { id: 'p-prep', min: 10, max: 29 },
+    { id: 'p-transcribe', min: 30, max: 54 },
+    { id: 'p-moments', min: 55, max: 69 },
+    { id: 'p-score', min: 70, max: 84 },
+    { id: 'p-render', min: 85, max: 100 },
   ];
 
-  stepMap.forEach(s => {
-    const el = document.getElementById(s.id);
-    if (job.progress_pct >= s.max || (job.status === 'completed' && s.min <= 100)) {
+  nodes.forEach(n => {
+    const el = document.getElementById(n.id);
+    if (job.progress_pct >= n.max || (job.status === 'completed' && n.min <= 100)) {
       el.classList.remove('active');
       el.classList.add('done');
-    } else if (job.progress_pct >= s.min) {
+    } else if (job.progress_pct >= n.min) {
       el.classList.add('active');
       el.classList.remove('done');
     } else {
@@ -244,26 +237,25 @@ function updateProgressUI(job) {
     }
   });
 
-  // Terminal log stream
-  const term = document.getElementById('log-terminal');
+  const logBox = document.getElementById('log-box');
   if (job.logs && job.logs.length > 0) {
-    term.innerHTML = job.logs.map(line => `<div class="log-line">${escapeHtml(line)}</div>`).join('');
-    term.scrollTop = term.scrollHeight;
+    logBox.innerHTML = job.logs.map(line => `<div class="log-row">${escapeHtml(line)}</div>`).join('');
+    logBox.scrollTop = logBox.scrollHeight;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Load & Render Clips Gallery
+// Gallery Management
 // ---------------------------------------------------------------------------
 
-async function loadClips(manualRefresh = false) {
+async function fetchClips(manual = false) {
   try {
     const res = await fetch('/api/clips');
     if (!res.ok) return;
 
     const data = await res.json();
     const grid = document.getElementById('clips-grid');
-    const empty = document.getElementById('empty-gallery');
+    const empty = document.getElementById('empty-state');
 
     if (!data.clips || data.clips.length === 0) {
       grid.innerHTML = '';
@@ -272,49 +264,45 @@ async function loadClips(manualRefresh = false) {
     }
 
     empty.classList.add('hidden');
-    grid.innerHTML = data.clips.map(clip => renderClipCard(clip)).join('');
+    grid.innerHTML = data.clips.map(clip => buildClipCard(clip)).join('');
 
-    if (manualRefresh) {
-      showToast(`Loaded ${data.clips.length} clip(s)`);
+    if (manual) {
+      notify(`LOADED ${data.clips.length} CLIPS`);
     }
   } catch (err) {
-    console.error('Error loading clips:', err);
+    console.error('Fetch clips error:', err);
   }
 }
 
-function renderClipCard(clip) {
-  const scoreFormatted = clip.score ? `${clip.score.toFixed(1)}/10` : 'AI Pick';
-  const timestampFormatted = clip.timestamp || 'Clip';
-  const sizeMb = clip.size_mb ? `${clip.size_mb} MB` : '';
+function buildClipCard(clip) {
+  const scoreBadge = clip.score ? `★ ${clip.score.toFixed(1)}` : 'AI PICK';
+  const timeBadge = clip.timestamp || 'CLIP';
+  const sizeText = clip.size_mb ? `${clip.size_mb}MB` : 'MP4';
 
   return `
     <div class="clip-card" id="card-${clip.id}">
-      <div class="clip-video-wrapper">
-        <video class="clip-video" controls playsinline preload="metadata">
+      <div class="video-frame">
+        <video class="video-player" controls playsinline preload="metadata">
           <source src="${clip.video_url}" type="video/mp4">
-          Your browser does not support the video tag.
         </video>
       </div>
-      <div class="clip-body">
-        <div class="clip-meta-row">
-          <span class="badge badge-score">★ ${scoreFormatted}</span>
-          <span class="badge badge-pill">${timestampFormatted}</span>
+      <div class="clip-content">
+        <div class="clip-tags">
+          <span class="tag-score">${scoreBadge}</span>
+          <span class="tag-time">${timeBadge}</span>
         </div>
-        <h4 class="clip-title">${escapeHtml(clip.title || clip.filename)}</h4>
+        <div class="clip-heading">${escapeHtml(clip.title || clip.filename)}</div>
         ${clip.caption ? `
-          <div class="clip-caption-box">
+          <div class="caption-wrapper">
             <p>${escapeHtml(clip.caption)}</p>
           </div>
         ` : ''}
-        ${clip.reasoning ? `
-          <p class="clip-reasoning">${escapeHtml(clip.reasoning)}</p>
-        ` : ''}
-        <div class="clip-actions">
-          <button class="btn-action btn-accent" onclick="copyCaption('${escapeJs(clip.caption || clip.title)}')">
-            <span>📋</span> Copy Caption
+        <div class="card-actions">
+          <button class="action-btn btn-copy" onclick="copyText('${escapeJs(clip.caption || clip.title)}')">
+            COPY
           </button>
-          <a class="btn-action" href="${clip.video_url}" download="${clip.filename}">
-            <span>⬇</span> Download ${sizeMb}
+          <a class="action-btn" href="${clip.video_url}" download="${clip.filename}">
+            GET ${sizeText}
           </a>
         </div>
       </div>
@@ -323,34 +311,33 @@ function renderClipCard(clip) {
 }
 
 // ---------------------------------------------------------------------------
-// Utilities
+// Helpers
 // ---------------------------------------------------------------------------
 
-function copyCaption(text) {
+function copyText(text) {
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
-    showToast('Copied caption to clipboard! 📋');
+    notify('COPIED TO CLIPBOARD');
   }).catch(() => {
-    showToast('Failed to copy', true);
+    notify('COPY FAILED');
   });
 }
 
-function showToast(message, isError = false) {
+function notify(msg) {
   const toast = document.getElementById('toast');
-  const msgEl = document.getElementById('toast-message');
+  const text = document.getElementById('toast-text');
 
-  msgEl.textContent = message;
-  toast.style.borderColor = isError ? 'var(--accent-danger)' : 'var(--accent-primary)';
+  text.textContent = msg;
   toast.classList.remove('hidden');
 
   setTimeout(() => {
     toast.classList.add('hidden');
-  }, 3500);
+  }, 2500);
 }
 
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -358,7 +345,7 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
-function escapeJs(text) {
-  if (!text) return '';
-  return text.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
+function escapeJs(str) {
+  if (!str) return '';
+  return str.replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
 }

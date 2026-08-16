@@ -3,192 +3,158 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auto-Clipper — AI Long-to-Short Video Engine</title>
-  <meta name="description" content="Turn long videos into viral 9:16 vertical social media clips with animated captions and AI scoring.">
+  <title>CLIPIT — AI Video Clipper</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="background-glow"></div>
+  <!-- Ambient Noise / Subtle Gradient Background -->
+  <div class="ambient-glow"></div>
 
   <!-- Header -->
-  <header class="navbar">
-    <div class="nav-container">
+  <header class="header">
+    <div class="header-inner">
       <div class="brand">
-        <span class="brand-icon">🎬</span>
-        <span class="brand-name">auto-clipper</span>
-        <span class="badge badge-subtle">v1.0</span>
+        <svg class="brand-svg" viewBox="0 0 32 32" fill="currentColor">
+          <path d="M5.469 16.688l8.75-8.75c0.094-0.094 0.844-0.844 2.031-1.25 1.656-0.531 3.344-0.094 4.688 1.25 1.375 1.344 1.781 3 1.25 4.656-0.375 1.188-1.156 2-1.25 2.094l-9.406 9.406c-1.625 1.625-5.688 3.719-9.438 0-3.719-3.719-1.594-7.813 0-9.406l10.094-10.125c0.375-0.375 0.969-0.375 1.344 0s0.375 0.969 0 1.344l-10.063 10.125c-0.156 0.125-3.313 3.406 0 6.719 3.219 3.219 6.375 0.344 6.719 0l9.406-9.438s0.531-0.531 0.781-1.281c0.313-1 0.094-1.875-0.781-2.75-1.875-1.875-3.688-0.313-4.031 0l-8.75 8.719c-0.313 0.313-0.531 0.844 0 1.375s1.031 0.281 1.344 0l6.063-6.063c0.375-0.344 1-0.344 1.344 0 0.375 0.375 0.375 1 0 1.375l-6.063 6.031c-0.844 0.813-2.563 1.469-4.031 0-1.5-1.469-0.844-3.219 0-4.031z"/>
+        </svg>
+        <span class="brand-title">CLIPIT</span>
       </div>
-      <div class="nav-status">
-        <span class="status-dot"></span>
-        <span class="status-text">Pipeline Ready</span>
+      <div class="header-status">
+        <span class="status-indicator"></span>
+        <span class="status-label">ONLINE</span>
       </div>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="container">
-    <!-- Hero Header -->
-    <section class="hero-section">
-      <h1 class="hero-title">Transform Long Videos into <span class="gradient-text">Viral Short Clips</span></h1>
-      <p class="hero-subtitle">Automatic transcription, AI moment scoring, 9:16 vertical reframing, and animated burned-in captions in one click.</p>
-    </section>
-
-    <!-- Generator Control Card -->
-    <section class="card input-card">
-      <!-- Input Mode Switcher -->
-      <div class="tab-group">
-        <button id="tab-url" class="tab-btn active" onclick="switchInputMode('url')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          YouTube / Twitch URL
-        </button>
-        <button id="tab-file" class="tab-btn" onclick="switchInputMode('file')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          Upload Local Video
-        </button>
+  <!-- Main View -->
+  <main class="main-content">
+    
+    <!-- Input Section -->
+    <section class="panel input-panel">
+      
+      <!-- Mode Tabs -->
+      <div class="tabs">
+        <button id="tab-url" class="tab active" onclick="switchMode('url')">URL</button>
+        <button id="tab-file" class="tab" onclick="switchMode('file')">FILE</button>
       </div>
 
-      <!-- URL Input Form -->
-      <div id="url-input-container" class="input-pane">
-        <div class="input-wrapper">
-          <input type="url" id="video-url" class="text-input" placeholder="Paste YouTube or Twitch URL (e.g. https://www.youtube.com/watch?v=...)" autocomplete="off">
-          <button class="clear-btn" onclick="document.getElementById('video-url').value=''">✕</button>
+      <!-- URL Input -->
+      <div id="url-box" class="input-row">
+        <input type="url" id="video-url" class="field text-field" placeholder="YouTube or Twitch URL" autocomplete="off" spellcheck="false">
+      </div>
+
+      <!-- File Dropzone -->
+      <div id="file-box" class="input-row hidden">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+          <input type="file" id="file-input" class="hidden" accept="video/*" onchange="handleFile(event)">
+          <div class="dropzone-text" id="dropzone-text">Drop video file here or click to browse</div>
         </div>
       </div>
 
-      <!-- File Upload Form -->
-      <div id="file-input-container" class="input-pane hidden">
-        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-upload').click()">
-          <input type="file" id="file-upload" class="hidden-file-input" accept="video/mp4,video/mkv,video/quicktime,video/webm" onchange="handleFileSelect(event)">
-          <div class="dropzone-content">
-            <svg class="dropzone-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>
-            <p class="dropzone-text" id="dropzone-label">Click or drag & drop a video file here (.mp4, .mov, .mkv)</p>
-            <span class="dropzone-hint" id="dropzone-hint">Preserves original quality and synchronized audio</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Settings Row -->
-      <div class="settings-grid">
-        <div class="setting-item">
-          <label class="setting-label" for="num-clips">Clips to Generate</label>
-          <select id="num-clips" class="select-input">
-            <option value="1">1 Clip</option>
-            <option value="3" selected>3 Clips</option>
-            <option value="5">5 Clips</option>
-            <option value="7">7 Clips</option>
+      <!-- Settings Grid -->
+      <div class="controls-grid">
+        <div class="control">
+          <label for="num-clips">CLIPS</label>
+          <select id="num-clips" class="field select-field">
+            <option value="1">1</option>
+            <option value="3" selected>3</option>
+            <option value="5">5</option>
+            <option value="7">7</option>
           </select>
         </div>
 
-        <div class="setting-item">
-          <label class="setting-label" for="max-duration">Max Duration</label>
-          <select id="max-duration" class="select-input">
-            <option value="5">First 5 min (Fast)</option>
-            <option value="10" selected>First 10 min</option>
-            <option value="20">First 20 min</option>
-            <option value="">Full Video</option>
+        <div class="control">
+          <label for="max-duration">DURATION</label>
+          <select id="max-duration" class="field select-field">
+            <option value="5">First 5m</option>
+            <option value="10" selected>First 10m</option>
+            <option value="20">First 20m</option>
+            <option value="">Full</option>
           </select>
         </div>
 
-        <div class="setting-item">
-          <label class="setting-label" for="whisper-model">Whisper Model</label>
-          <select id="whisper-model" class="select-input">
-            <option value="base" selected>Base (Fast & Reliable)</option>
-            <option value="tiny">Tiny (Ultra-Fast)</option>
-            <option value="small">Small (Higher Accuracy)</option>
-            <option value="medium">Medium (Studio Grade)</option>
+        <div class="control">
+          <label for="whisper-model">WHISPER</label>
+          <select id="whisper-model" class="field select-field">
+            <option value="tiny">Tiny</option>
+            <option value="base" selected>Base</option>
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
           </select>
         </div>
 
-        <div class="setting-item">
-          <label class="setting-label" for="llm-model">AI Scoring Model</label>
-          <select id="llm-model" class="select-input">
-            <option value="openai/gpt-4o-mini" selected>ChatGPT 4o-Mini (~$0.0005/run)</option>
-            <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (100% Free)</option>
-            <option value="deepseek/deepseek-chat">DeepSeek V3 (~$0.0004/run)</option>
-            <option value="openai/gpt-4o">ChatGPT 4o</option>
-            <option value="anthropic/claude-sonnet-4-5">Claude 3.5 Sonnet</option>
+        <div class="control">
+          <label for="llm-model">AI MODEL</label>
+          <select id="llm-model" class="field select-field">
+            <option value="openai/gpt-4o-mini" selected>GPT-4o Mini</option>
+            <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 Free</option>
+            <option value="deepseek/deepseek-chat">DeepSeek V3</option>
+            <option value="openai/gpt-4o">GPT-4o</option>
+            <option value="anthropic/claude-sonnet-4-5">Claude 3.5</option>
           </select>
         </div>
       </div>
 
       <!-- Action Button -->
-      <div class="action-bar">
-        <button id="generate-btn" class="btn-primary" onclick="startGeneration()">
-          <span class="btn-text">Generate Vertical Clips</span>
-          <span class="btn-icon">⚡</span>
-        </button>
+      <button id="clip-btn" class="btn-clip" onclick="startClipping()">
+        <span id="clip-btn-text">CLIP</span>
+        <svg class="btn-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </section>
+
+    <!-- Real-time Progress (Minimalist Tracker) -->
+    <section id="progress-panel" class="panel progress-panel hidden">
+      <div class="progress-info">
+        <div class="progress-state">
+          <span class="pulse-indicator"></span>
+          <span id="progress-step-text" class="progress-step-text">PROCESSING</span>
+        </div>
+        <span id="progress-val" class="progress-val">0%</span>
+      </div>
+
+      <div class="meter">
+        <div id="meter-fill" class="meter-fill" style="width: 5%;"></div>
+      </div>
+
+      <div class="pipeline-track">
+        <div id="p-prep" class="p-node active">PREP</div>
+        <div id="p-transcribe" class="p-node">TRANSCRIBE</div>
+        <div id="p-moments" class="p-node">MOMENTS</div>
+        <div id="p-score" class="p-node">SCORE</div>
+        <div id="p-render" class="p-node">RENDER</div>
+      </div>
+
+      <div id="log-box" class="log-box">
+        <div class="log-row text-dim">[00:00:00] Initializing pipeline...</div>
       </div>
     </section>
 
-    <!-- Pipeline Progress Section (Hidden when idle) -->
-    <section id="progress-card" class="card progress-card hidden">
-      <div class="progress-header">
-        <div class="progress-title-group">
-          <div class="spinner"></div>
-          <div>
-            <h3 class="progress-step-title" id="progress-step-title">Processing video...</h3>
-            <p class="progress-step-desc" id="progress-step-desc">Pipeline is executing step-by-step</p>
-          </div>
-        </div>
-        <span class="progress-percentage" id="progress-percentage">0%</span>
-      </div>
-
-      <!-- Progress Bar -->
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill" id="progress-bar-fill" style="width: 5%;"></div>
-      </div>
-
-      <!-- Step Indicators -->
-      <div class="pipeline-steps">
-        <div class="step-badge" id="step-download"><span class="step-num">1</span> Media Prep</div>
-        <div class="step-badge" id="step-transcribe"><span class="step-num">2</span> Whisper AI</div>
-        <div class="step-badge" id="step-candidates"><span class="step-num">3</span> Moments</div>
-        <div class="step-badge" id="step-score"><span class="step-num">4</span> LLM Scoring</div>
-        <div class="step-badge" id="step-render"><span class="step-num">5</span> 9:16 Render</div>
-      </div>
-
-      <!-- Live Log Stream (Collapsible) -->
-      <details class="log-details" open>
-        <summary class="log-summary">Pipeline Execution Logs</summary>
-        <div class="log-terminal" id="log-terminal">
-          <div class="log-line text-muted">[System] Ready. Waiting for pipeline start...</div>
-        </div>
-      </details>
-    </section>
-
-    <!-- Clips Gallery Section -->
+    <!-- Output Gallery -->
     <section class="gallery-section">
-      <div class="gallery-header">
-        <div>
-          <h2 class="gallery-title">Generated Clips</h2>
-          <p class="gallery-subtitle">9:16 Vertical video with animated captions & ready-to-post copy</p>
-        </div>
-        <button class="btn-secondary" onclick="loadClips(true)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-          Refresh
-        </button>
+      <div class="gallery-bar">
+        <div class="gallery-tag">OUTPUTS</div>
+        <button class="btn-refresh" onclick="fetchClips(true)" title="Refresh gallery">REFRESH</button>
       </div>
 
-      <!-- Clips Grid -->
       <div id="clips-grid" class="clips-grid">
-        <!-- Rendered dynamically by app.js -->
+        <!-- Injected dynamically -->
       </div>
 
-      <!-- Empty State -->
-      <div id="empty-gallery" class="empty-state hidden">
-        <div class="empty-icon">🎞️</div>
-        <h3 class="empty-title">No clips generated yet</h3>
-        <p class="empty-desc">Paste a YouTube link or upload a local video above to create your first set of vertical clips.</p>
+      <div id="empty-state" class="empty-state hidden">
+        <svg class="empty-icon" viewBox="0 0 32 32" fill="currentColor">
+          <path d="M5.469 16.688l8.75-8.75c0.094-0.094 0.844-0.844 2.031-1.25 1.656-0.531 3.344-0.094 4.688 1.25 1.375 1.344 1.781 3 1.25 4.656-0.375 1.188-1.156 2-1.25 2.094l-9.406 9.406c-1.625 1.625-5.688 3.719-9.438 0-3.719-3.719-1.594-7.813 0-9.406l10.094-10.125c0.375-0.375 0.969-0.375 1.344 0s0.375 0.969 0 1.344l-10.063 10.125c-0.156 0.125-3.313 3.406 0 6.719 3.219 3.219 6.375 0.344 6.719 0l9.406-9.438s0.531-0.531 0.781-1.281c0.313-1 0.094-1.875-0.781-2.75-1.875-1.875-3.688-0.313-4.031 0l-8.75 8.719c-0.313 0.313-0.531 0.844 0 1.375s1.031 0.281 1.344 0l6.063-6.063c0.375-0.344 1-0.344 1.344 0 0.375 0.375 0.375 1 0 1.375l-6.063 6.031c-0.844 0.813-2.563 1.469-4.031 0-1.5-1.469-0.844-3.219 0-4.031z"/>
+        </svg>
+        <div class="empty-text">NO CLIPS YET</div>
       </div>
     </section>
   </main>
 
-  <!-- Toast Notification -->
+  <!-- Minimal Toast -->
   <div id="toast" class="toast hidden">
-    <span id="toast-message">Message</span>
+    <span id="toast-text"></span>
   </div>
 
   <script src="/static/app.js"></script>
